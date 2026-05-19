@@ -43,6 +43,18 @@ ES_INDEX_RUNBOOK=runbook_docs
 `.env.example` 의 인덱스 섹션 주석에도 새 코퍼스의 언어/성격을 한 줄로
 적어두면 좋습니다 (영문 공식 docs인지 한국어 사내 코퍼스인지).
 
+> **인덱스명 우선순위.** `.env` 의 값 → (없으면) `config.py` 의 default
+> 값 순서로 적용됩니다. 즉 `.env` 에 `ES_INDEX_RUNBOOK` 을 빠뜨려도
+> Step 3 에서 등록한 default(`"runbook_docs"`) 가 그대로 쓰여 코드는
+> 동작합니다 — 하지만 운영 환경에서는 항상 `.env` 에 명시해 두는 것이
+> 안전합니다 (default 변경 시 의도치 않은 인덱스로 트래픽이 흐르는
+> 사고를 막기 위함).
+>
+> 현재 `backend/.env` 에는 `ES_INDEX_ELASTICSEARCH`,
+> `ES_INDEX_KAFKA` 만 명시돼 있고 `ES_INDEX_CONFLUENCE` 는 config.py
+> default(`"confluence_docs"`) 에 의존합니다. 새 인덱스를 추가할 때
+> 이 관행을 따를지, `.env` 에 명시할지는 팀 정책에 맞추세요.
+
 ### Step 3 — `config.py` 등록
 
 **`backend/app/config.py`**:
@@ -321,9 +333,11 @@ backend/
 
 ```bash
 # 인덱스 (Step 2 참조)
+# 현재 .env 에는 ELASTICSEARCH, KAFKA 만 명시. CONFLUENCE 는 config.py
+# default("confluence_docs") 에 의존 — 필요 시 .env 에 명시 추가.
 ES_INDEX_ELASTICSEARCH=elasticsearch_docs
 ES_INDEX_KAFKA=kafka_docs
-ES_INDEX_CONFLUENCE=confluence_docs
+ES_INDEX_CONFLUENCE=confluence_docs   # 선택 — 미지정 시 config.py default
 
 # 필드 (Step 1 매핑과 일치해야 함)
 ES_FIELD_TITLE=title
