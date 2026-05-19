@@ -15,7 +15,9 @@ from langchain_core.messages import HumanMessage
 
 from app import prompts
 from app.graph.nodes import PROGRESS_KEY
+from app.graph.nodes.generate import _format_user_md_block
 from app.graph.state import RAGState
+from app.services.instruction_store import get_user_md
 from app.services.llm_factory import get_generator_llm
 from app.services.log_store import fetch_recent_turns
 
@@ -172,7 +174,10 @@ async def debug_explain(state: RAGState) -> dict:
         }
 
     context = _render_turns(turns)
-    prompt = prompts.DEBUG_EXPLAIN.format(query=query, turns=context)
+    user_md_block = _format_user_md_block(await get_user_md(user_id))
+    prompt = prompts.DEBUG_EXPLAIN.format(
+        query=query, turns=context, user_md_block=user_md_block
+    )
 
     response = await get_generator_llm().ainvoke([HumanMessage(content=prompt)])
     content = response.content if hasattr(response, "content") else str(response)

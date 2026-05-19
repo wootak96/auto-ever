@@ -26,7 +26,7 @@ from app.services.llm_factory import get_generator_llm, get_judge_llm
 
 
 _NO_USER_REPLY = (
-    "✅ 지침을 이해했습니다. 다만 로그인 정보가 없어 다음 대화에서는 기억하지 못해요."
+    "알겠습니다. 다만 로그인 정보가 없어 다음 대화에서는 기억하지 못해요."
 )
 
 
@@ -71,7 +71,7 @@ async def instruction_save(state: RAGState) -> dict:
     )
     reply = (
         response.content if hasattr(response, "content") else str(response)
-    ) or "✅ 지침을 기억해 두었습니다."
+    ) or "알겠습니다."
 
     return {
         "final_answer": reply,
