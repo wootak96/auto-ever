@@ -8,6 +8,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from app.config import get_settings
+
 router = APIRouter()
 
 
@@ -15,7 +17,7 @@ CHAT_HTML = """<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>오토에버 클라우드솔루션팀 챗봇</title>
+<title>@@BOT_NAME@@</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Markdown renderer (GFM: tables, lists, headings) + sanitizer. Loaded
      synchronously so the renderText() defined further down can rely on
@@ -403,7 +405,7 @@ CHAT_HTML = """<!doctype html>
   <!-- Login screen: shown when ?user_id=<id> is missing from the URL -->
   <div id="login-screen" style="display:none;">
     <div id="login-card">
-      <h2>오토에버 클라우드솔루션팀 챗봇</h2>
+      <h2>@@BOT_NAME@@</h2>
       <p>사용자 아이디를 입력하면 챗봇으로 진입합니다. 입력한 아이디는 URL 파라미터로 부착됩니다.</p>
       <form id="login-form" autocomplete="off">
         <label for="login-id">사용자 아이디</label>
@@ -416,7 +418,7 @@ CHAT_HTML = """<!doctype html>
 
   <!-- Chat UI: shown when ?user_id=<id> is present -->
   <header id="chat-header" style="display:none;">
-    <h1>오토에버 클라우드솔루션팀 챗봇</h1>
+    <h1>@@BOT_NAME@@</h1>
     <span class="spacer"></span>
     <span class="user-pill" id="user-pill"></span>
     <button id="clear">대화 초기화</button>
@@ -714,7 +716,7 @@ CHAT_HTML = """<!doctype html>
   // of every chat. It is NOT added to `messages` (so it never gets sent to the
   // backend as history) but stays visible above the conversation forever —
   // streamed (typewriter) on first appearance, static on subsequent reloads.
-  const INTRO_TEXT = '안녕하세요 저는 오토에버 클라우드솔루션팀 챗봇입니다. 무엇을 도와드릴까요?';
+  const INTRO_TEXT = '안녕하세요 저는 @@BOT_NAME@@입니다. 무엇을 도와드릴까요?';
   // Typewriter timer for the intro stream — must be cancellable so that if
   // the user sends a message mid-stream we don't keep ticking against a
   // detached DOM node.
@@ -1026,4 +1028,7 @@ CHAT_HTML = """<!doctype html>
 
 @router.get("/", response_class=HTMLResponse)
 async def chat_ui() -> HTMLResponse:
-    return HTMLResponse(content=CHAT_HTML)
+    # Branding is substituted at request time rather than import time so a
+    # changed CHATBOT_NAME takes effect on reload without a code change.
+    html = CHAT_HTML.replace("@@BOT_NAME@@", get_settings().chatbot_name)
+    return HTMLResponse(content=html)

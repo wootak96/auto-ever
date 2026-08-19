@@ -2,7 +2,7 @@
 
 Two providers are supported and switched via LLM_PROVIDER:
   - "openai": public OpenAI (or any OpenAI-compatible base URL).
-  - "azure":  HMG internal Azure OpenAI gateway (production default).
+  - "azure":  Azure OpenAI gateway, typically internal (production default).
 
 API key resolution order (per call):
   1. The contextvar `_api_key_var` if set (populated from the incoming
@@ -65,7 +65,7 @@ def _build(
             kwargs["base_url"] = s.openai_base_url.strip()
         return ChatOpenAI(**kwargs)
 
-    # azure (HMG internal gateway)
+    # azure (internal corporate gateway)
     from langchain_openai import AzureChatOpenAI
 
     return AzureChatOpenAI(

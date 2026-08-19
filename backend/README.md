@@ -7,8 +7,9 @@ OpenAI-compatible RAG server. FastAPI + LangGraph in front of Elasticsearch
 
 ```bash
 uv sync --all-extras
-cp .env.example .env        # already created on first setup
-$EDITOR .env                # fill in [필수] sections
+cp .env.example .env                                    # fill in [필수] sections
+cp app/internal_terms.example.json app/internal_terms.json   # 사내 용어 (아래 참조)
+$EDITOR .env app/internal_terms.json
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -23,7 +24,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 | `LLM_PROVIDER` | 채워야 할 키 | 비고 |
 |----------------|--------------|------|
 | `openai` (테스트용) | `OPENAI_API_KEY` (선택: `OPENAI_MODEL`, `OPENAI_BASE_URL`) | 퍼블릭 OpenAI 또는 OpenAI 호환 프록시 |
-| `azure` (운영) | `HCHAT_API_KEY` | HMG 사내 게이트웨이. `HCHAT_ENDPOINT`/`HCHAT_DEPLOYMENT`는 SPEC 기본값 |
+| `azure` (운영) | `HCHAT_API_KEY` | 사내 게이트웨이. `HCHAT_ENDPOINT`/`HCHAT_DEPLOYMENT`는 SPEC 기본값 |
 
 채팅 UI 상단의 키 입력란에 값을 넣으면 그 값이 우선 적용되고, 비우면 위 env 키가 폴백.
 
@@ -46,6 +47,21 @@ curl -s http://localhost:8000/health | python3 -m json.tool
 
 `elasticsearch.reachable: true`, `indices.elasticsearch_docs: true`,
 `indices.kafka_docs: true`, `llm.api_key_configured: true` 면 정상.
+
+## 사내 용어와 브랜딩
+
+배포 환경마다 달라지는 두 가지는 소스가 아니라 설정에 있습니다.
+
+**`app/internal_terms.json`** — 사내에만 존재하는 고유명사 목록. 질문에 이
+단어가 등장하면 LLM 판정과 무관하게 Confluence 인덱스를 검색 대상에 강제로
+포함시킵니다. 특정 회사를 지목하는 정보라 **저장소에 포함되지 않고**,
+`internal_terms.example.json`(플레이스홀더)만 추적됩니다. 파일을 만들지 않으면
+예시 파일로 폴백해 기동은 되지만 이 라우팅은 사실상 동작하지 않습니다.
+경로는 `INTERNAL_TERMS_FILE` 로도 지정할 수 있습니다. 자세한 카테고리 설명은
+`OPERATIONS.md` Step 7 참조.
+
+**`CHATBOT_NAME`** — UI 제목·헤더·로그인 카드·인트로 문구와 잡담/일반대화
+페르소나에 함께 쓰이는 표시 명칭. 기본값은 `사내 문서 챗봇`입니다.
 
 ## Tests
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from app import prompts
+from app import internal_terms, prompts
 from app.graph.nodes import PROGRESS_KEY
 from app.graph.nodes._helpers import llm_json, render_history, truncate_history
 from app.graph.state import RAGState
@@ -34,35 +34,34 @@ _DOMAIN_PATTERN = re.compile(
 )
 
 
-# Internal-only proper nouns supplied by the user (HMG company terms,
-# product names, location names, internal-namespace path prefixes). Anything
-# matching this MUST also be treated as a domain question and MUST add
-# confluence_docs to the routing — even if the LLM doesn't recognize the
-# term. Kept as a separate pattern so `index_route` can reuse it.
+# Internal-only vocabulary. Anything matching this MUST also be treated as a
+# domain question and MUST add confluence_docs to the routing — even if the
+# LLM doesn't recognize the term. Kept as a separate pattern so `index_route`
+# can reuse it.
+#
+# Two halves, and they are separated on purpose:
+#
+#   • Site-specific proper nouns — product names, acronyms, offices,
+#     namespace prefixes. These differ per deployment and name a real
+#     organisation, so they are loaded from `app/internal_terms.json`
+#     (gitignored) rather than written here. See `app.internal_terms`.
+#   • Operational-state phrasing — "운영 중인", "장애 이력". Generic Korean
+#     that means "OUR systems, not the public docs" at any company, so it
+#     stays in code.
+#
+# A deployment with no terms file still gets the second half; the pattern
+# simply matches fewer questions.
+_INTERNAL_STATE_ALTERNATIVES = [
+    r"운영\s*중인",
+    r"사용\s*중인",
+    r"운용\s*중인",
+    r"현재\s*(운영|사용|쓰고)",
+    r"클러스터\s*(현황|상태|이력|장애)",
+    r"장애\s*(이력|기록|발생|났|났던|있었|있던)",
+]
+
 _INTERNAL_PATTERN = re.compile(
-    r"(?i)("
-    # HMG cloud platforms / internal products
-    r"hmgcloud|hcloud|hmgsearch|vaatz|evplatform|kafkaadm|"
-    # Internal acronyms — word boundaries reduce false positives on
-    # substrings inside unrelated English text
-    r"\bvdsp\b|\bdsp\b|\bota\b|\baip\b|\bpam\b|\bhae\b|"
-    r"\bhkmc\b|\bhmg\b|\bhchat\b|"
-    # Internal locations (Korean, no boundary needed for CJK)
-    r"상암|가산|광주|의왕|"
-    # Team / industry context
-    r"클라우드솔루션|완성차|"
-    # ES path namespaces (leading slash distinguishes from generic words)
-    r"/es_engine|/es_log|/es_data|"
-    # Internal operational-state context — phrases implying "OUR
-    # clusters / OUR systems" (running, in-use, prior incidents). Such
-    # info lives only in the internal wiki, never in public docs, so
-    # confluence MUST be in the routing. Public-tech indices may still
-    # be added by the LLM if a tech keyword (ES/Kafka) also appears.
-    r"운영\s*중인|사용\s*중인|운용\s*중인|"
-    r"현재\s*(운영|사용|쓰고)|"
-    r"클러스터\s*(현황|상태|이력|장애)|"
-    r"장애\s*(이력|기록|발생|났|났던|있었|있던)"
-    r")"
+    "(?i)(" + "|".join(internal_terms.regex_alternatives() + _INTERNAL_STATE_ALTERNATIVES) + ")"
 )
 
 # Meta-collection safety net: questions about the chatbot's document
@@ -115,7 +114,7 @@ def _has_domain_term(text: str) -> bool:
 
 
 def _has_internal_term(text: str) -> bool:
-    """True when an HMG-internal proper noun appears — used by the index
+    """True when an organisation-internal term appears — used by the index
     router to force-include confluence_docs regardless of the LLM verdict."""
     return bool(_INTERNAL_PATTERN.search(text or ""))
 

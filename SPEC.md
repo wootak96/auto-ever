@@ -7,7 +7,7 @@
 > - 임베딩: ES `_inference`(`hchat-embedding`) → `semantic_text` 필드 자동 임베딩(`text-embedding-3-small`, 1536d)
 > - 워크플로우: §3.4 채택. 리랭커(ES `text_similarity_reranker` / LLM 리랭크) 모두 **보류**
 > - **per-sub-query 인덱스 라우팅** 추가 (`index_route` 노드)
-> - LLM provider **스위치**: OpenAI(현재 테스트) / Azure HMG(운영) 양립
+> - LLM provider **스위치**: OpenAI(현재 테스트) / Azure(운영, 사내 게이트웨이) 양립
 > - LLM API 키: `Authorization: Bearer <key>` 헤더로 per-request 오버라이드 가능
 > - 프론트엔드: chatbot-ui(Next.js) → FastAPI **내장 인라인 HTML/JS** (`GET /`)
 > - 배포: Docker Compose → uv 단독 실행 (Docker은 운영 전환 시 추가)
@@ -23,8 +23,8 @@
 > - 테스트: provider-aware fallback (`active_api_key`) 비교로 수정 → 57/57 통과
 >
 > **3차 변경 (브랜딩 + 4-intent 라우팅 + UI 테마)**
-> - **챗봇 브랜딩**: 모든 표시 명칭을 **"오토에버 클라우드솔루션팀 챗봇"**으로 통일 (브라우저 title, 헤더, 로그인 카드, 빈 상태)
-> - **로그인 인트로 메시지**: 로그인 직후 빈 채팅창에 어시스턴트 버블로 자동 표시 — *"안녕하세요 저는 오토에버 클라우드솔루션팀 챗봇입니다. 무엇을 도와드릴까요?"* (transient, `messages` 배열에 미포함 → 백엔드 전송 X)
+> - **챗봇 브랜딩**: 모든 표시 명칭을 **"사내 문서 챗봇"(`CHATBOT_NAME` 설정값)**으로 통일 (브라우저 title, 헤더, 로그인 카드, 빈 상태)
+> - **로그인 인트로 메시지**: 로그인 직후 빈 채팅창에 어시스턴트 버블로 자동 표시 — *"안녕하세요 저는 사내 문서 챗봇입니다. 무엇을 도와드릴까요?"* (transient, `messages` 배열에 미포함 → 백엔드 전송 X)
 > - **4-intent 라우팅**: `query_analyze` intent 확장 → `question` / `followup` / `chitchat` / **`general`** (도메인 외 일반 질문)
 > - **새 노드 `general_chat`**: 사내 문서 도메인 밖 질문에 일반 LLM 지식으로 친절히 답변. 첫 줄에 *"ℹ️ 사내 문서 범위 밖의 질문이라 일반 지식으로 답변드릴게요."* 안내 후 본 답변. 토큰 스트리밍
 > - **사이클 fallback**: `hybrid_retrieve ↔ self_check` 사이클이 retry 한도 도달 시 dead-end(`해당 정보를 찾을 수 없습니다`) 대신 **`general_chat`으로 graceful escape**
@@ -78,7 +78,7 @@
 > - **`QUERY_REWRITE`/`QUERY_VARIATE` 인덱스별 언어 정책**: `{target_index}` 플레이스홀더 추가. `confluence_docs`이면 한국어 BM25 + 한국어 semantic noun phrase ("X 정의", "X 운영 가이드", "X 동작 원리" 등) 출력, 그 외(`elasticsearch_docs`/`kafka_docs`)는 영어 출력 ("definition of X", "how X works" 등). 두 정책 모두에서 기술용어(Elasticsearch, Kafka, RRF, BM25, kNN, consumer group 등)는 영어 유지
 > - **`INDEX_ROUTE` 프롬프트 확장**: `"confluence"` 옵션 추가, 사내 운영 맥락(회의록/장애 대응/인수인계 등)이 함께 등장하면 공개 인덱스 + confluence 동시 라우팅 가이드 명시
 > - **`QUERY_ANALYZE` 도메인 단어 리스트 + `_DOMAIN_PATTERN` 정규식 확장**: confluence 키워드 17종 추가 (`Confluence`, `컨플루언스`, `위키`, `wiki`, `회의록`, `미팅록`, `미팅 노트`, `운영 가이드/매뉴얼/절차`, `장애 대응/보고`, `인수 인계`, `사내 표준/정책/가이드/매뉴얼/절차`, `팀 위키`). 공백 변동 흡수(`\s*`). confluence-only 질문("회의록 보여줘", "운영 가이드 어디 있어?")이 LLM에서 `general` 오분류돼도 정규식 safety net이 `question`으로 강제 override
-> - **모든 프롬프트의 prose를 영어로 전환** (예시 섹션은 한국어 입력 분포 유지). LLM이 영어 instruction을 더 안정적으로 따른다는 사용자 판단. 챗봇 출력 리터럴은 한국어 보존 ("해당 정보를 찾을 수 없습니다.", "오토에버 클라우드솔루션팀 챗봇" 정체성, "ℹ️ 사내 문서 범위 밖의 질문이라..." 헤더 등). `GENERATE`/`CHITCHAT`/`GENERAL_CHAT`은 첫 줄에 `Respond in Korean.` 명시. `QUERY_REFORM`은 출력이 한국어 문장이므로 "Output in Korean" 명시
+> - **모든 프롬프트의 prose를 영어로 전환** (예시 섹션은 한국어 입력 분포 유지). LLM이 영어 instruction을 더 안정적으로 따른다는 사용자 판단. 챗봇 출력 리터럴은 한국어 보존 ("해당 정보를 찾을 수 없습니다.", "사내 문서 챗봇"(`CHATBOT_NAME` 설정값) 정체성, "ℹ️ 사내 문서 범위 밖의 질문이라..." 헤더 등). `GENERATE`/`CHITCHAT`/`GENERAL_CHAT`은 첫 줄에 `Respond in Korean.` 명시. `QUERY_REFORM`은 출력이 한국어 문장이므로 "Output in Korean" 명시
 > - **`CHITCHAT`/`GENERAL_CHAT` 정체성 갱신**: "Elasticsearch / Kafka 등" → "Elasticsearch / Kafka 공식문서 + Confluence 사내 위키"로 명시
 > - **`workflow.py` SSE 직렬 정책 유지**: route/rewrite/metadata 구간은 데이터 의존성상 병렬화 가능하지만, 진행 메시지 race를 막기 위해 의도적 직렬 유지
 > - 테스트: 71/71 통과 (65 + confluence fan-out 1 + per-index rewrite 1 + count 3-인덱스 1 + 도메인 패턴 confluence 2)
@@ -107,7 +107,7 @@
 - 사내 폐쇄망 VM 단독 호스팅
 - 단일 호스트에서 `uvicorn` 직접 실행 (Docker는 운영 전환 시 도입)
 - 외부 인터넷 접근 불가 (사내 게이트웨이 경유)
-- 단계: 현재는 퍼블릭 OpenAI(`gpt-4o-mini` 등)로 개발/테스트, 추후 사내 Azure(HMG GW, `gpt-5.4-mini`)로 전환
+- 단계: 현재는 퍼블릭 OpenAI(`gpt-4o-mini` 등)로 개발/테스트, 추후 사내 Azure 게이트웨이(`gpt-5.4-mini`)로 전환
 
 ---
 
@@ -124,7 +124,7 @@
                               │     └──────────────────┘     │      ┌─────────────────────┐
                               │              │               │─────▶│  LLM Provider 스위치 │
                               └──────────────┼───────────────┘      │  ├─ OpenAI (현재)    │
-                                             │                      │  └─ Azure HMG GW     │
+                                             │                      │  └─ Azure 사내 GW    │
                                              └──────────────────────│     (운영 전환용)     │
                                                                     └─────────────────────┘
 ```
@@ -628,7 +628,7 @@ class RAGState(TypedDict):
 
 RRF(Reciprocal Rank Fusion)는 ... [1].
 BM25와 semantic 검색의 순위를 결합하여 ... [2].
-<!--CITES:[{"n":1,"url":"https://www.elastic.co/guide/..."},{"n":2,"url":"https://internal-wiki.hmg-corp.io/..."}]-->
+<!--CITES:[{"n":1,"url":"https://www.elastic.co/guide/..."},{"n":2,"url":"https://<your-internal-wiki>/..."}]-->
 ```
 
 (클라이언트는 `<!--CITES:...-->` 마커를 본문에서 떼어내 표시하지 않고, 본문의 `[1]`·`[2]`만 해당 url로 가는 클릭 가능한 앵커로 변환)
@@ -661,7 +661,7 @@ BM25와 semantic 검색의 순위를 결합하여 ... [2].
 ### 5.5 로그인 인트로 메시지 (3차 추가, 5차 타이핑 애니메이션)
 로그인 직후 빈 채팅창에 **transient 어시스턴트 버블**로 인트로 메시지를 표시:
 
-> 안녕하세요 저는 오토에버 클라우드솔루션팀 챗봇입니다. 무엇을 도와드릴까요?
+> 안녕하세요 저는 사내 문서 챗봇입니다. 무엇을 도와드릴까요?
 
 - `messages` 배열에 push되지 않음 → 백엔드로 전송되는 history에 포함 X (대화 컨텍스트 오염 방지)
 - **5차: 타이프라이터 스트림** — `setTimeout` 체인으로 글자당 35ms 간격 append. 250ms 초기 지연 후 시작. 자연스러운 등장감
@@ -686,10 +686,10 @@ llm = ChatOpenAI(
     streaming=True,
 )
 
-# (b) azure — 사내 HMG 운영
+# (b) azure — 사내 게이트웨이 운영
 from langchain_openai import AzureChatOpenAI
 llm = AzureChatOpenAI(
-    azure_endpoint="https://internal-apigw-kr.hmg-corp.io/hchat-in/api/v3",
+    azure_endpoint="https://<your-internal-gateway>/<path>/api/v3",
     azure_deployment="gpt-5.4-mini",
     api_version="2024-02-01",
     api_key=resolve_api_key(),       # Bearer 헤더 > .env HCHAT_API_KEY
@@ -884,9 +884,9 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini  # 선택, 기본 gpt-4o-mini
 OPENAI_BASE_URL=          # 선택, OpenAI 호환 프록시 사용 시
 
-# Azure / HMG 사내 (LLM_PROVIDER=azure 일 때 [필수])
+# Azure / 사내 게이트웨이 (LLM_PROVIDER=azure 일 때 [필수])
 HCHAT_API_KEY=<관리자-발급-키>
-HCHAT_ENDPOINT=https://internal-apigw-kr.hmg-corp.io/hchat-in/api/v3
+HCHAT_ENDPOINT=https://<your-internal-gateway>/<path>/api/v3
 HCHAT_DEPLOYMENT=gpt-5.4-mini
 HCHAT_API_VERSION=2024-02-01
 
@@ -925,10 +925,10 @@ LOG_LEVEL=INFO
 ## 11. 프롬프트 정책
 
 ### 11.1 공통 원칙
-- 챗봇 표시 명칭은 **"오토에버 클라우드솔루션팀 챗봇"** (UI / `CHITCHAT` / `GENERAL_CHAT` 프롬프트 모두 동일)
+- 챗봇 표시 명칭은 **"사내 문서 챗봇"(`CHATBOT_NAME` 설정값)** (UI / `CHITCHAT` / `GENERAL_CHAT` 프롬프트 모두 동일)
 - **8차 기준 모든 프롬프트의 prose는 영어** — LLM이 영어 instruction을 더 안정적으로 따른다는 사용자 판단. 다만:
   - 예시(few-shot) 섹션의 입력 쿼리는 **한국어 그대로 유지** (실제 사용자 입력 분포에 맞춤)
-  - 챗봇 출력에 등장하는 한국어 리터럴은 보존 (`"해당 정보를 찾을 수 없습니다."`, `"오토에버 클라우드솔루션팀 챗봇"` 정체성 문구, `"ℹ️ 사내 문서 범위 밖의 질문이라 일반 지식으로 답변드릴게요."` 등)
+  - 챗봇 출력에 등장하는 한국어 리터럴은 보존 (`"해당 정보를 찾을 수 없습니다."`, `"사내 문서 챗봇"(`CHATBOT_NAME` 설정값)` 정체성 문구, `"ℹ️ 사내 문서 범위 밖의 질문이라 일반 지식으로 답변드릴게요."` 등)
   - `GENERATE` / `CHITCHAT` / `GENERAL_CHAT`은 첫 줄에 `Respond in Korean.` 명시
   - `QUERY_REFORM`은 출력이 한국어 self-contained 문장이므로 "Output in Korean" 명시
 - **인덱스별 언어 정책 (8차)**: `QUERY_REWRITE` / `QUERY_VARIATE`는 `{target_index}` 플레이스홀더를 받아 분기. ES/Kafka 인덱스는 영어 출력, Confluence는 한국어 출력 (기술용어는 영어 유지)
@@ -995,7 +995,7 @@ curl -s http://localhost:8000/health | python3 -m json.tool
 - `LLM_PROVIDER=azure` + `HCHAT_API_KEY` 세팅
 - 필요 시 Docker / docker-compose 추가 (현재 미작성)
 - 사내 CA 인증서: `ES_CA_CERTS=/path/to/ca.pem` + `ES_VERIFY_CERTS=true`
-- HMG 사내 게이트웨이, Elasticsearch로의 네트워크 경로 방화벽 오픈 확인
+- 사내 게이트웨이, Elasticsearch로의 네트워크 경로 방화벽 오픈 확인
 
 ---
 
@@ -1026,13 +1026,13 @@ curl -s http://localhost:8000/health | python3 -m json.tool
 | M8 | LLM provider 스위치 (OpenAI 테스트용 / Azure 운영) + Bearer 헤더 키 오버라이드 | ✅ 완료 |
 | M9 | 실데이터 적합화 — BM25 단일 필드 fallback, metadata_extract 보수화, 출처 url 안전장치, 매핑 진단 | ✅ 완료 |
 | M10 | UI UX — 분해/재작성 결과 트리 표시, `query_decompose` 영문 프롬프트 + JSON 강제, 로그인 게이트(`?user_id=<id>`) + per-user 대화 분리 | ✅ 완료 |
-| M11 | 브랜딩 + 4-intent 라우팅 — "오토에버 클라우드솔루션팀 챗봇"으로 통일, `general` intent 추가, `general_chat` 노드 신규, 사이클 fallback (`hybrid_retrieve ↔ self_check → general_chat`), `CHITCHAT` 프롬프트 친근화, 로그인 인트로 메시지 | ✅ 완료 |
+| M11 | 브랜딩 + 4-intent 라우팅 — "사내 문서 챗봇"(`CHATBOT_NAME` 설정값)으로 통일, `general` intent 추가, `general_chat` 노드 신규, 사이클 fallback (`hybrid_retrieve ↔ self_check → general_chat`), `CHITCHAT` 프롬프트 친근화, 로그인 인트로 메시지 | ✅ 완료 |
 | M12 | UI 테마 iOS/iMessage 라이트로 전환 (다크모드 무시), backdrop blur 네비, 그라디언트 버블, 원형 ↑ 송신 버튼, safe-area 지원, 모바일 반응형 | ✅ 완료 |
 | M13 | 이중 쿼리 재작성 + UI 최소화 — `QUERY_REWRITE` 영어 `keywords`/`semantic` 2-output (semantic은 명사구 4~12 토큰, HyDE 금지), `semantic_queries` state 필드, `build_rrf_query` BM25/semantic 별도 텍스트, `QUERY_DECOMPOSE` 한국어 도메인 예시 추가, 헤더 API key/meta 표시 제거, `generate`/`general_chat` 진행 메시지 제거 | ✅ 완료 |
 | M14 | 인트로 메시지 타이핑 애니메이션 — 35ms/char 스트림, 250ms 초기 지연, 안전한 취소 로직 (`introTimer` + `cancelIntroStream()`). 5.1차에서 첫 메시지 후에도 영구 표시로 전환 | ✅ 완료 |
 | M15 | 검색 의도 분기 + 도메인 grounding 강화 — `search_intent`(lookup/count/list) 노드, `query_variate` retry 변형, `query_analyze` 도메인 단어 정규식 안전망, retry 소진 시 `general_chat` 폴백 제거(grounded-only), 출처 중복 픽스, `general` whitelist 픽스 | ✅ 완료 |
 | M16 | intent 분류 ↔ 쿼리 재작성 분리 — `query_analyze`를 3-intent 분류만 담당하도록 단순화(`followup` 제거), `query_reform` 노드 신규로 history-aware self-contained 재작성을 단일 책임으로 추출, history 빈 경우 LLM 호출 스킵, `list_titles` 집계 필드를 `title.keyword`로 교체 | ✅ 완료 |
-| M17 | 사내 Azure(HMG) 전환 + 실제 ES 인덱스 보강(title/url/source/category/updated_at) | ⏳ 대기 |
+| M17 | 사내 Azure 게이트웨이 전환 + 실제 ES 인덱스 보강(title/url/source/category/updated_at) | ⏳ 대기 |
 | M18 | 리랭커 (필요 시) — ES `text_similarity_reranker` 또는 LLM 리랭크 | ⏳ 보류 |
 | M19 | Docker / docker-compose 패키징 (운영 전환 시) | ⏳ 보류 |
 | M20 | 프롬프트 튜닝 + 출처 포맷 확정 | ⏳ 진행 중 |

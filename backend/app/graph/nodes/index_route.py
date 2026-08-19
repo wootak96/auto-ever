@@ -38,10 +38,12 @@ async def _route_one(query: str, alias_map: dict[str, str]) -> list[str]:
     valid = [a for a in aliases if a in alias_map]
     if not valid:
         valid = list(alias_map.keys())  # fallback: search all for recall
-    # Force-include confluence whenever an HMG-internal proper noun appears
-    # (Hmgcloud, vDSP, /es_engine, 상암, etc.). The LLM may not recognize
-    # these org-specific terms, but the user's intent is unambiguous: those
-    # docs only live in the internal wiki. Belt-and-braces over the LLM.
+    # Force-include confluence whenever an organisation-internal term
+    # appears — a product name, an internal acronym, an office, a namespace
+    # prefix (see `app.internal_terms`). The LLM may not recognize terms
+    # that exist only inside one company, but the user's intent is
+    # unambiguous: those docs live only in the internal wiki. Belt-and-
+    # braces over the LLM.
     if (
         _CONFLUENCE_ALIAS in alias_map
         and _has_internal_term(query)

@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Placeholder vocabulary. Copy this file to internal_terms.json and replace",
+    "the values with your organisation's own terms — that copy is gitignored.",
+    "",
+    "A term here means: a word that appears in the internal wiki and nowhere in",
+    "public documentation. Matching one force-includes the Confluence index in",
+    "routing, regardless of what the LLM decided.",
+    "",
+    "products   — internal platform / product names. Matched as substrings.",
+    "acronyms   — internal abbreviations. Matched with ASCII word boundaries so",
+    "             a short one does not fire inside an unrelated English word.",
+    "locations  — offices or sites. CJK terms need no boundary.",
+    "org        — team or business-domain names.",
+    "namespaces — internal index / path prefixes."
+  ],
+  "products": ["acmecloud", "acmesearch", "acmeadm", "docportal"],
+  "acronyms": ["ADP", "vADP", "AIP", "PAM"],
+  "locations": ["본사", "제2사옥", "연구소"],
+  "org": ["플랫폼팀", "인프라팀"],
+  "namespaces": ["/svc_engine", "/svc_log", "/svc_data"]
+}

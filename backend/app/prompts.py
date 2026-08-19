@@ -6,6 +6,25 @@ and a few literal Korean strings are preserved where they belong to the
 chatbot's user-facing output (e.g., "해당 정보를 찾을 수 없습니다.").
 """
 
+from app import internal_terms
+from app.config import get_settings
+
+
+def _fill(template: str) -> str:
+    """Substitute deployment-specific text into a prompt template.
+
+    Sentinels are `@@NAME@@`, not `{name}`: these strings are later passed
+    through `str.format()` with the query, and every literal brace in them is
+    already doubled for that pass. A brace-based placeholder here would have
+    to survive that escaping too.
+    """
+    settings = get_settings()
+    return (
+        template.replace("@@INTERNAL_TERMS@@", internal_terms.prompt_block())
+        .replace("@@INTERNAL_EXAMPLE@@", internal_terms.example_term())
+        .replace("@@BOT_NAME@@", settings.chatbot_name)
+    )
+
 QUERY_ANALYZE = """You are the query classifier for an internal corporate chatbot. The chatbot searches THREE domains of internal documents:
 - Elasticsearch official docs (English)
 - Kafka official docs (English)
@@ -458,7 +477,7 @@ Respond ONLY with JSON:
 """
 
 
-INDEX_ROUTE = """You are the index router for a RAG chatbot.
+INDEX_ROUTE = _fill("""You are the index router for a RAG chatbot.
 
 Available indices:
 - "elasticsearch": Elasticsearch 공식문서. ES 질문은 토픽 성격에 따라 라우팅을 다르게 한다:
@@ -476,15 +495,11 @@ Available indices:
   - 포함 범위: REST/admin API, 브로커·컨슈머·프로듀서 운영, 메커니즘 설명, 개념·입문, KIPs, 릴리즈 노트, JIRA 이슈, Sarama Go, Confluent Schema Registry, librdkafka, Amazon MSK
   - **Kafka 질문에 `confluence`를 추가하는 경우는 다음뿐**:
     1. 사내 맥락이 명시 ("사내", "우리", "팀", "내부 클러스터", "운영 중인 Kafka", "장애 났던 Kafka")
-    2. 사내 고유명사 동반 (kafkaadm 등)
+    2. 사내 고유명사 동반 (@@INTERNAL_EXAMPLE@@ 등)
     이외에는 Kafka 질문에 `confluence`를 절대 포함하지 말 것.
 - "confluence": 사내 Confluence 위키 문서. **사내 운영 가이드 / 회의록 / 장애 대응 / 인수인계 / 사내 표준·정책 / 팀 위키 / 사내 프로젝트 메모 / 한국어로 작성된 운영·관리 문서** 등. ES/Kafka 같은 기술 토픽이라도 "사내 운영", "사내 가이드", "회의록", "인수인계", "장애 대응 절차" 같은 사내 맥락이 함께 등장하면 confluence를 선택.
   - **사내 전용 고유명사 (이 단어가 등장하면 항상 `confluence` 포함)**:
-    플랫폼/제품명 — Hmgcloud, hCloud, Hmgsearch, vaatz, evplatform, kafkaadm, hchat
-    사내 약어 — DSP, vDSP, OTA, AIP, PAM, HAE, HKMC, HMG
-    사옥/지역 — 상암, 가산, 광주, 의왕
-    조직/도메인 — 클라우드솔루션, 완성차
-    사내 ES 네임스페이스 경로 — /es_engine, /es_log, /es_data
+@@INTERNAL_TERMS@@
     이런 단어들은 외부 공개 문서에는 등장하지 않으므로 일반 acronym (예: "DSP" = "Digital Signal Processing")으로 해석하지 말 것.
   - **사내 운영 상태/장애 이력 질의 (이런 표현이 등장하면 항상 `confluence` 포함)**:
     - "운영 중인 / 사용 중인 / 운용 중인 클러스터(또는 ES/Kafka)" — 우리가 실제로 굴리는 시스템 정보를 묻는 것.
@@ -503,9 +518,9 @@ Routing guidance:
   - **모든 Kafka 질문은 기본 `kafka` 단독.** ES의 3계층 규칙을 Kafka에 적용하지 말 것 — Kafka는 공식문서가 개념/운영/레퍼런스 모두 커버한다.
   - 컨슈머·프로듀서 동작, 토픽/파티션/오프셋, 메시지 보장, 컨슈머 그룹, 리밸런싱, 스트림즈, ksqlDB, 스키마 레지스트리, 트러블슈팅, 업그레이드, 릴리즈 노트 → 전부 `kafka` 단독.
   - "Kafka가 뭐야", "컨슈머 그룹이 뭐야" 같은 개념/입문 질문도 `kafka` 단독 (ES와 다르게 confluence로 보내지 말 것).
-  - 사내 맥락("사내", "우리", "팀", "내부 클러스터", "운영 중인 Kafka", "장애 났던 Kafka") 또는 사내 고유명사(kafkaadm 등)가 함께 있을 때만 `kafka` + `confluence`.
+  - 사내 맥락("사내", "우리", "팀", "내부 클러스터", "운영 중인 Kafka", "장애 났던 Kafka") 또는 사내 고유명사(@@INTERNAL_EXAMPLE@@ 등)가 함께 있을 때만 `kafka` + `confluence`.
 - If the question explicitly references BOTH a public technology (Elasticsearch/Kafka) AND an internal operational context ("사내 운영 가이드", "사내 장애 대응", "회의록", "인수인계"), pick both the relevant public index AND `confluence`.
-- If the question contains any HMG-internal proper noun listed above, ALWAYS include `confluence` in the result (alone, or together with `elasticsearch`/`kafka` when public-tech terms also appear).
+- If the question contains any organisation-internal term listed above, ALWAYS include `confluence` in the result (alone, or together with `elasticsearch`/`kafka` when public-tech terms also appear).
 - If the question compares public domains (e.g., ES vs Kafka), pick both `elasticsearch` and `kafka`.
 - If the question is ambiguous and you cannot tell, pick all relevant indices (recall first).
 
@@ -530,14 +545,14 @@ Routing guidance:
 - "Kafka 메시지 보장 방식" → `kafka` (개념 — kafka 단독)
 - "Kafka 3.7 릴리즈 노트" → `kafka` (릴리즈 노트 — 단독)
 - "운영 중인 Kafka 클러스터 장애" → `kafka` + `confluence` (사내 클러스터 상태)
-- "kafkaadm 사용법" → `confluence` (사내 고유명사)
+- "@@INTERNAL_EXAMPLE@@ 사용법" → `confluence` (사내 고유명사)
 
 Respond ONLY with JSON:
 {{"indices": ["elasticsearch", "kafka", "confluence"]}}
 
 [질문]
 {query}
-"""
+""")
 
 
 SEARCH_INTENT_CLASSIFY = """Classify what kind of Elasticsearch query shape the user's question requires for searching internal documents.
@@ -699,17 +714,17 @@ Rules:
 """
 
 
-CHITCHAT = """You are the "오토에버 클라우드솔루션팀 챗봇". Respond in Korean.
+CHITCHAT = _fill("""You are the "@@BOT_NAME@@". Respond in Korean.
 Reply to the user's utterance below in 1~2 friendly, natural Korean sentences.
 - For greetings/thanks, respond warmly.
-- For questions about the chatbot's identity ("who are you", etc.), briefly introduce yourself as "오토에버 클라우드솔루션팀의 사내 문서(Elasticsearch / Kafka 공식문서 + Confluence 사내 위키)를 검색해 답변하는 챗봇".
+- For questions about the chatbot's identity ("who are you", etc.), briefly introduce yourself as "@@BOT_NAME@@ — 사내 문서(Elasticsearch / Kafka 공식문서 + Confluence 사내 위키)를 검색해 답변하는 챗봇".
 - Do NOT repeat the role description every time. A simple greeting back is fine for a greeting.
 
 **Priority when the [사용자 지침] block sets preferences:** tone, honorific level (존댓말/반말), persona, length → **user instructions ALWAYS win.** Default to 존댓말 only when [사용자 지침] is empty or silent on tone. If the block says 반말 / casual / 친근, switch to 반말 fully.
 {user_md_block}
 [발화]
 {query}
-"""
+""")
 
 
 GROUNDEDNESS_CHECK = """You verify whether each cited claim in the AI's answer is actually supported by the cited source document.
@@ -736,7 +751,7 @@ Respond ONLY with JSON:
 """
 
 
-GENERAL_CHAT = """You are the "오토에버 클라우드솔루션팀 챗봇". Respond in Korean.
+GENERAL_CHAT = _fill("""You are the "@@BOT_NAME@@". Respond in Korean.
 The user has asked a general question outside the internal-document domain (Elasticsearch 공식문서 / Kafka 공식문서 / Confluence 사내 위키).
 Reply with general knowledge or natural conversation.
 
@@ -756,7 +771,7 @@ Rules:
 
 [질문]
 {query}
-"""
+""")
 
 
 INSTRUCTION_UPDATE = """You maintain a per-user "answer-style preferences" markdown document. The user just issued a directive about HOW the bot should answer in the future. Your job is to merge that directive into the existing markdown and output the new, fully-rewritten markdown.

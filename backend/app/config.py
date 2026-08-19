@@ -11,13 +11,20 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # User-facing chatbot name. Appears in the web UI title/header/intro and
+    # in the chitchat + general-chat personas. Deployment branding, so it is
+    # a setting rather than a literal scattered across prompts and HTML.
+    chatbot_name: str = "사내 문서 챗봇"
+
     # ────── LLM provider switch ──────
     # "openai": public OpenAI (or any OpenAI-compatible base URL)
-    # "azure":  HMG internal Azure OpenAI gateway (production)
+    # "azure":  Azure OpenAI, typically an internal corporate gateway
     llm_provider: Literal["openai", "azure"] = "azure"
 
-    # Azure (HMG internal gateway)
-    hchat_endpoint: str = "https://internal-apigw-kr.hmg-corp.io/hchat-in/api/v3"
+    # Azure / internal gateway. No default endpoint on purpose: a real
+    # gateway hostname is deployment infrastructure and does not belong in
+    # source. Set HCHAT_ENDPOINT in .env when LLM_PROVIDER=azure.
+    hchat_endpoint: str = ""
     hchat_deployment: str = "gpt-5.4-mini"
     hchat_api_version: str = "2024-02-01"
     hchat_api_key: str = ""

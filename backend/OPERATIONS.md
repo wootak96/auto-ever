@@ -146,16 +146,37 @@ _VALID_FORCED_INDICES = frozenset({
 가장 안전합니다. 또한 새 인덱스를 사용하는 **예시 한두 개** 를 12개 예시
 블록 뒤에 추가하면 LLM 일관성이 더 좋아집니다.
 
-### Step 7 — (선택) 사내 코퍼스라면 `_INTERNAL_PATTERN`
+### Step 7 — (선택) 사내 코퍼스라면 사내 고유명사 등록
 
 새 인덱스가 사내 고유명사 / 사내 운영 컨텍스트 전용이라면
-**`backend/app/graph/nodes/query_analyze.py:42`** `_INTERNAL_PATTERN` 에
-관련 키워드를 추가합니다. 이 패턴은 `index_route._route_one()` 이
-`_has_internal_term(query)` 로 검사해서 **LLM 판정과 무관하게**
-confluence(또는 새 사내 인덱스)를 force-include 합니다.
+**`backend/app/internal_terms.json`** 에 관련 단어를 추가합니다. 이 파일은
+`_INTERNAL_PATTERN`(`query_analyze.py`)과 `INDEX_ROUTE` 프롬프트 양쪽에
+주입되고, `index_route._route_one()` 이 `_has_internal_term(query)` 로 검사해
+**LLM 판정과 무관하게** confluence(또는 새 사내 인덱스)를 force-include
+합니다.
+
+```json
+{
+  "products":   ["제품명 — 부분 문자열로 매칭"],
+  "acronyms":   ["약어 — ASCII 단어 경계로 매칭"],
+  "locations":  ["사옥/지역"],
+  "org":        ["조직/도메인"],
+  "namespaces": ["/인덱스_경로_접두사"]
+}
+```
+
+**이 파일은 저장소에 포함되지 않습니다.** 실제 사내 용어는 특정 회사를
+지목하는 정보라서 `.gitignore` 대상이고, 추적되는 것은 플레이스홀더인
+`internal_terms.example.json` 뿐입니다. 배포 환경마다 직접 만들어 두거나
+`INTERNAL_TERMS_FILE` 로 경로를 지정하세요. 파일이 없으면 예시 파일로
+폴백하며, 이때 사내 고유명사 기반 강제 라우팅은 사실상 동작하지 않습니다
+(기동 로그에 warning이 남습니다).
+
+"운영 중인", "장애 이력" 같은 **운영 상태 표현**은 어느 회사에서나 같은
+뜻이므로 코드(`_INTERNAL_STATE_ALTERNATIVES`)에 그대로 남아 있습니다.
 
 새 인덱스 자체에 대한 force-include 규칙이 필요하면 `_route_one` 의
-confluence 강제 추가 로직(`index_route.py:45`) 을 참고해 같은 패턴으로
+confluence 강제 추가 로직(`index_route.py`) 을 참고해 같은 패턴으로
 추가하면 됩니다.
 
 ### Step 8 — 검증 체크리스트

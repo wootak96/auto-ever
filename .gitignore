@@ -15,6 +15,12 @@ env/
 .env.local
 *.env.local
 
+# Deployment-specific vocabulary. The router force-includes the internal wiki
+# index on terms that exist only inside one organisation — product names,
+# acronyms, offices. That list names a real company, so the real file stays
+# out of the repository and only internal_terms.example.json is tracked.
+backend/app/internal_terms.json
+
 # Testing
 .pytest_cache/
 .coverage

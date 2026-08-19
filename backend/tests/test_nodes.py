@@ -2,6 +2,7 @@
 
 import pytest
 
+from app import internal_terms
 from app.graph.nodes import PROGRESS_KEY
 from app.graph.nodes.generate import generate
 from app.graph.nodes.hybrid_retrieve import hybrid_retrieve
@@ -12,6 +13,12 @@ from app.graph.nodes.query_decompose import query_decompose
 from app.graph.nodes.query_reform import query_reform
 from app.graph.nodes.query_rewrite import query_rewrite
 from app.graph.nodes.self_check import self_check, should_retry
+
+
+# Taken from whichever terms file is active rather than written literally, so
+# these tests exercise the real routing path on a deployment that supplies its
+# own vocabulary and still pass on a clean checkout that only has the example.
+INTERNAL_TERM = internal_terms.example_term()
 
 
 @pytest.mark.asyncio
@@ -389,13 +396,13 @@ async def test_index_route_no_subqueries(stub_judge):
 
 @pytest.mark.asyncio
 async def test_index_route_internal_term_forces_confluence(stub_judge):
-    """HMG-internal proper nouns must always include confluence_docs even if
+    """Organisation-internal terms must always include confluence_docs even if
     the LLM picks something else. Belt-and-braces over the LLM."""
-    # LLM hallucinates: routes Hmgcloud to elasticsearch (it doesn't know the
+    # LLM hallucinates: routes the internal term to elasticsearch (it does not know the
     # term). Our deterministic override must add confluence_docs.
     stub_judge(['{"indices": ["elasticsearch"]}'])
     out = await index_route(
-        {"sub_queries": ["Hmgcloud 사용법"], "intent": "question"}
+        {"sub_queries": [f"{INTERNAL_TERM} 사용법"], "intent": "question"}
     )
     assert set(out["target_indices_per_query"][0]) == {
         "elasticsearch_docs",
@@ -405,11 +412,13 @@ async def test_index_route_internal_term_forces_confluence(stub_judge):
 
 @pytest.mark.asyncio
 async def test_index_route_internal_path_namespace(stub_judge):
-    """Internal ES path namespaces (/es_engine, /es_log, /es_data) route to
-    confluence even when the LLM would otherwise pick only public indices."""
+    """Internal path namespaces route to confluence even when the LLM would
+    otherwise pick only public indices. The prefix is read from the active
+    terms file for the same reason as INTERNAL_TERM above."""
+    namespace = internal_terms.load_terms()["namespaces"][0]
     stub_judge(['{"indices": ["elasticsearch"]}'])
     out = await index_route(
-        {"sub_queries": ["/es_engine 인덱스 설정"], "intent": "question"}
+        {"sub_queries": [f"{namespace} 인덱스 설정"], "intent": "question"}
     )
     assert "confluence_docs" in out["target_indices_per_query"][0]
 
@@ -418,20 +427,21 @@ async def test_index_route_internal_path_namespace(stub_judge):
 async def test_index_route_internal_term_no_duplicate_confluence(stub_judge):
     """When the LLM already picks confluence, the override must NOT duplicate
     it — set semantics, not list-append."""
+    org = internal_terms.load_terms()["org"][0]
     stub_judge(['{"indices": ["confluence"]}'])
     out = await index_route(
-        {"sub_queries": ["완성차 운영 가이드"], "intent": "question"}
+        {"sub_queries": [f"{org} 운영 가이드"], "intent": "question"}
     )
     assert out["target_indices_per_query"][0].count("confluence_docs") == 1
 
 
 @pytest.mark.asyncio
 async def test_query_analyze_internal_term_overrides_general(stub_judge):
-    """Sentences that contain only an HMG-internal proper noun and no other
-    domain word (e.g., "Hmgsearch가 뭐야?") must still go to the search path."""
+    """Sentences that contain only an organisation-internal term and no other
+    domain word (e.g., "acmesearch가 뭐야?") must still go to the search path."""
     stub_judge(['{"intent": "general"}'])
     out = await query_analyze(
-        {"current_query": "Hmgsearch가 뭐야?", "messages": []}
+        {"current_query": f"{INTERNAL_TERM}가 뭐야?", "messages": []}
     )
     assert out["intent"] == "question"
 
