@@ -133,3 +133,11 @@ has the placeholder.
 - `SPEC.md` — nine rounds of design changes, and the current specification
 - `backend/OPERATIONS.md` — runbook for adding a search index or editing a query
 - `backend/README.md` — how to fill in each `.env` entry
+
+## About
+
+Built by [wny](https://github.com/shinwootag). I work on retrieval and knowledge
+systems — hybrid document search here, ontology reasoning in
+[human-networking-ontology](https://github.com/shinwootag/human-networking-ontology).
+What interests me is the part after the answer appears: where it came from, and
+whether a reader can check it.
